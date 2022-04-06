@@ -1,0 +1,205 @@
+/****************************************NodeServerAPI*********************************/
+    "ip": "54.169.74.104",
+    "port": 8080,
+    "zone": "Casino_Admin",
+    "handler_name": "BotStatus",
+    "loginuser": "testuser1",
+    "req_params":{"client_id":10,"game_id":67, "player_type": "all"}
+
+
+/* Importing Libraries and Files*/
+const index = require("../SmartFoxServer/index");
+const SFS2X = require("sfs2x-api"); 
+const express = require("express");
+const res = require("express/lib/response");
+const Joi = require("@hapi/joi");
+const { config } = require("dotenv");
+const app = express();
+app.use(express.json());
+
+// Importing the sfsConn() function
+const { sfsConn } = require("../SmartFoxServer/index");
+const { request } = require("express");
+
+// Import the myModule variable.
+let myModule = require("../SmartFoxServer/index");
+let sfsresponseinterval;
+
+//CREATE request handlers
+app.post("/sfs/userdata", (req, res) => {
+  /**All the request parameters */
+  let handler_name = req.body.handler_name;
+  let reqparams = req.body.req_params;
+  let ip = req.body.ip;
+  let port = req.body.port;
+  let zone = req.body.zone;
+ 
+/*Calling sfsConn function from index.js file */
+  sfsConn(reqparams, handler_name, ip, port, zone);
+
+  // Set setInterval Time function.  /*Export variables from index.js */
+  sfsresponseinterval = setInterval(function () {
+    // Import the two variables: ResponseVar, GotResponse.
+    let ResponseVar = myModule.ResponseVar; 
+    let GotResponse = myModule.GotResponse;
+    console.log(GotResponse);
+    if (GotResponse == 1) {
+      myModule.GotResponse = 0; 
+      clearInterval(sfsresponseinterval);
+      console.log("resp:" + ResponseVar);
+      res.status(200).json({ resp: ResponseVar });
+    }
+  }, 1000);
+});
+
+// PORT ENVIRONMENT
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`Listening on port ${port}..`));
+
+
+
+
+/*********************************Index.js**************************/
+
+/*Importing libraries and Files */
+const WebSocket = require("ws");``
+Object.assign(global, { WebSocket: require("ws") });
+const SFS2X = require("sfs2x-api");
+const { response } = require("express");
+const res = require("express/lib/response");
+
+/*********Variable declaration***********/
+let GotResponse = 0;
+let ResponseVar = [];
+let login = false;
+let config = {};
+let handlerName = '';
+let loginUser='';
+
+// export the function.
+exports.sfsConn = (reqParms, handler_name, ip, port, zone) => {
+  // Create configuration object
+  config.host = "54.169.74.104";
+  config.port = 8080;
+  config.handler_name = handler_name;
+  config.zone = "Casino_Admin";
+  config.debug = false;
+  config.useSSL = false;
+
+  // Parameter declaration.
+  clientid = reqParms.client_id;
+  gameid = reqParms.game_id;
+  playertype = reqParms.player_type;
+  handlerName = handler_name;
+  reqParams = reqParms;
+  loginuser = loginUser;
+
+  console.log(config);
+
+  // create SmartFox client instance
+  sfs = new SFS2X.SmartFox(config);
+
+  /**************** Event Listeners ********************/
+  sfs.addEventListener(SFS2X.SFSEvent.EXTENSION_RESPONSE,onExtensionResponse, this);
+  sfs.addEventListener(SFS2X.SFSEvent.CONNECTION, onConnection, this);
+  sfs.addEventListener(SFS2X.SFSEvent.CONNECTION_LOST, onConnectionLost, this);
+  sfs.addEventListener(SFS2X.SFSEvent.LOGIN, onLogin, this);
+  sfs.addEventListener(SFS2X.SFSEvent.LOGIN_ERROR, onLoginError, this);
+  sfs.addEventListener(SFS2X.SFSEvent.LOGOUT, onLogOut, this);
+
+  //Connect to SmartFoxServer
+  sfs.connect();
+};
+
+/*onLogin function */
+function onLogin(event) {
+  console.log("Login Successfull !");
+  login = true;
+  console.log(reqParams, handlerName);
+  if(handlerName == "BotStatus"){
+    get_count(reqParams, handlerName);
+  } else{
+  //   sfs.disconnect()
+  }
+}
+
+/*onLogin Error function */
+function onLoginError(event) {
+  console.log("Login Failure: " + event.errorMessage);
+}
+
+/*onConnection function */
+function onConnection(event) {
+  if (event.success) {
+    console.log("Connected to SmartFoxServer 2X!");
+    console.log("SFS2X API version:" + sfs.version);
+    sfs.send(new SFS2X.LoginRequest(loginUser, "", null, config.zone));
+  } 
+  else {
+    console.warn("Connection Failed: " +(event.errorMessage? event.errorMessage + "(" + event.errorCode + ")": "Is the server running at all?"));
+  }
+}
+
+/*onConnectionLost function */
+function onConnectionLost(event) {
+   login = false;
+  let reason = event.reason;
+  console.log("Disconnection occured; reason: " + event.reason);
+}
+
+/*onLogOut function */
+function onLogOut(event) {  
+  sfs.send(new SFS2X.LogoutRequest());
+  console.log("LogOut Executed!!");
+}
+
+/*onExtensionRequest function */
+function onExtensionResponse(evtparams) {
+  switch(evtparams.cmd)
+  {
+    case 'BotStatus':
+    responseBot(evtparams)
+    break;
+  }
+}
+// responseBot() function
+function responseBot(evtparams) {
+  
+  if(evtparams.cmd == 'BotStatus'){
+    let responseParams = evtparams.params;
+    console.log("The result is: " + responseParams.getBool("result"));
+    console.log("The table name is: " + responseParams.getUtfStringArray("tableName"));
+    console.log("The bot name is: " + responseParams.getUtfStringArray("botName"));
+    console.log("The message is: " + responseParams.getUtfString("message"));
+    console.log("The player_type is: " + responseParams.getUtfStringArray("playerType"));
+
+    /**Get all the Parameters */
+    var result = responseParams.getBool("result");
+    var tableName = responseParams.getUtfStringArray("tableName");
+    var botName = responseParams.getUtfStringArray("botName");
+    var message = responseParams.getUtfString("message");
+    var playerType = responseParams.getUtfStringArray("playerType")
+
+    /*Put all the parameters in one Variable*/
+    ResponseVar = {"result":result, "tablename":tableName, "botName":botName, "message":message, "playertype":playerType};
+
+    console.log(ResponseVar);
+
+    // Export the variables:
+    exports.ResponseVar = ResponseVar;
+    GotResponse = 1;
+    exports.GotResponse = GotResponse;
+    sfs.disconnect();
+    }
+} 
+
+// Performing the SFSExtensionRequest:
+function get_count(reqParams,handlerName) {   
+  let params = new SFS2X.SFSObject();
+  console.log(reqParams)
+ params.putInt("client_id", reqParams.client_id);
+ params.putInt("game_id", reqParams.game_id);
+ params.putUtfString("playerType", reqParams.player_type);
+
+ sfs.send(new SFS2X.ExtensionRequest(handlerName, params));
+}

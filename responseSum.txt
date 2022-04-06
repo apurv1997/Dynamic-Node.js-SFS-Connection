@@ -1,0 +1,190 @@
+                                       /********** NodeServerAPI.js File *************/
+
+const index = require("../SmartFoxServer/index");
+const SFS2X = require("sfs2x-api");
+const express = require("express");
+const res = require("express/lib/response");
+const Joi = require("@hapi/joi");
+const { config } = require("dotenv");
+const app = express();
+app.use(express.json());
+
+// import the sfsConn function
+const { sfsConn } = require("../SmartFoxServer/index");
+
+// import the {responseflag, SumResult} variable
+var myModule = require("../SmartFoxServer/index");
+const { request } = require("express");
+var responseflag = myModule.responseflag;
+var SumResult = myModule.SumResult;
+
+var GotResponse = myModule.GotResponse;
+
+var sfsresponseinerval;
+
+// READ request handlers
+/******************** SFS API *********************/
+app.get("/sfs", (req, res) => {
+  res.send("Smart Fox Server!!");
+});
+
+//CREATE request handlers
+app.post("/sfs/userdata", (req, res) => {
+  var num1 = req.body.num1;
+  var num2 = req.body.num2;
+  sfsConn(num1, num2);
+  sfsresponseinerval = setInterval(function () {
+
+    // Set setInterval Time function.  /*Export variables from index.js */
+    var ResponseVar = myModule.ResponseVar; 
+    var GotResponse = myModule.GotResponse;
+    console.log(GotResponse);
+    if (GotResponse == 1) {
+      myModule.GotResponse = 0; // declaring variable = 0
+      clearInterval(sfsresponseinerval);
+      console.log("res:" + ResponseVar);
+      res.status(200).json({ sum: ResponseVar });
+    }
+  }, 100);
+});
+
+// //PORT ENVIRONMENT
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`Listening on port ${port}..`));
+
+                                            /********************* Index.js *********************/
+
+const WebSocket = require("ws");
+Object.assign(global, { WebSocket: require("ws") });
+const SFS2X = require("sfs2x-api");
+const { response } = require("express");
+const res = require("express/lib/response");
+
+// Variable declaration
+var GotResponse = 0;
+var ResponseVar = 0;
+let login = false;
+let config = {};
+
+let snum1 = 0;
+let snum2 = 0;
+
+// export the function.
+exports.sfsConn = (num1,num2) => {
+  // Create configuration object
+  config.host = "192.168.0.82";
+  config.port = 8080;
+  config.debug = false; //initially true
+  config.zone = "FirstZone";
+  config.useSSL = false;
+
+  snum1 = num1;
+  snum2 = num2;
+  console.log(config);
+
+  // create SmartFox client instance
+  sfs = new SFS2X.SmartFox(config);
+
+  /**************** Event Listeners ********************/
+  sfs.addEventListener(SFS2X.SFSEvent.EXTENSION_RESPONSE,onExtensionResponse,this);
+  sfs.addEventListener(SFS2X.SFSEvent.CONNECTION, onConnection, this);
+  sfs.addEventListener(SFS2X.SFSEvent.CONNECTION_LOST, onConnectionLost, this);
+  sfs.addEventListener(SFS2X.SFSEvent.LOGIN, onLogin, this);
+  sfs.addEventListener(SFS2X.SFSEvent.LOGIN_ERROR, onLoginError, this);
+  sfs.addEventListener(SFS2X.SFSEvent.LOGOUT, onLogOut, this);
+
+  //Connect to SmartFoxServer
+  sfs.connect();
+};
+
+function onLogin(event) {
+  console.log("Login Successfull !");
+  login = true;
+
+  // if(HANDLER NAME = "SUM")
+  // get_count(snum1,snum2);
+  // else IDBCursor()
+  // LKFWF()
+
+
+}
+
+function onLoginError(event) {
+  console.log("Login Failure: " + event.errorMessage);
+}
+
+//Connection event handler
+function onConnection(event) {
+  if (event.success) {
+    console.log("Connected to SmartFoxServer 2X!");
+    console.log("SFS2X API version:" + sfs.version);
+
+    sfs.send(new SFS2X.LoginRequest("FozzieTheBear", "", null, config.zone));
+  } else {
+    console.warn("Connection Failed: " +(event.errorMessage? event.errorMessage + "(" + event.errorCode + ")": "Is the server running at all?")
+    );
+  }
+}
+
+//Disconnection event handler
+function onConnectionLost(event) {
+   login = false;
+  var reason = event.reason;
+  console.log("Disconnection occured; reason: " + event.reason);
+}
+
+function onLogOut(event) {
+  sfs.send(new SFS2X.LogoutRequest());
+  console.log("LogOut Executed!!");
+}
+
+function onExtensionResponse(evtparams) {
+
+  switch(evtparams.cmd)
+  {
+
+    // case:"sum"
+    // responsesum(evtparams)
+    // break;
+  }
+
+   sfs.disconnect();
+}
+
+function responsesum(evtparams){
+  if (evtparams.cmd == "Sum") {
+    let responseParams = evtparams.params;
+    console.log("The sum is: " + responseParams.getInt("sumOfNum"));
+    console.log("The status is: " + responseParams.getBool("status"));
+    console.log("The message is: " + responseParams.getUtfString("message"));
+
+    ResponseVar = responseParams.getInt("sumOfNum");
+  
+    console.log(ResponseVar);
+    exports.ResponseVar = ResponseVar;
+    GotResponse = 1;
+    exports.GotResponse = GotResponse;
+  }
+}
+
+function get_count(num1,num2) {            // call this const in onLogin() const
+
+  // Send two integers to the Zone extension and get their sum in return
+  var params = new SFS2X.SFSObject();
+  params.putInt("num1", num1);
+  params.putInt("num2", num2);
+
+  sfs.send(new SFS2X.ExtensionRequest("Sum", params));
+}
+
+// Export the above variables
+exports.GotResponse = GotResponse;
+exports.ResponseVar = ResponseVar;
+
+
+    ResponseVar = responseParams.getBool("result");
+    ResponseVar = responseParams.getStringArray("tableName");
+    ResponseVar = responseParams.getStringArray("botName");
+    ResponseVar = responseParams.getUtfString("message");
+
+
